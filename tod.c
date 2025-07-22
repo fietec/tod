@@ -5,6 +5,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include <cwalk.h>
+
 #define MAX_LINE_LEN 4096
 #define ALPHABET_SIZE 256
 
@@ -75,7 +77,7 @@ int search_dir(const char *dirname, const char *needle)
     char item_path[FILENAME_MAX] = {0};
     while ((entry = readdir(dir))){
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
-        snprintf(item_path, FILENAME_MAX, "%s/%s", dirname, entry->d_name);
+        cwk_path_join(dirname, entry->d_name, item_path, sizeof(item_path));
         struct stat attr;
         if (stat(item_path, &attr) == -1){
             fprintf(stderr, "[ERROR] Could not access '%s': %s!\n", item_path, strerror(errno));
