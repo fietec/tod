@@ -33,7 +33,7 @@ void search_line(const char *filename, const char *line, int line_len, const cha
             j--;
         }
         if (j < 0) {
-            int format_len = printf("%s:%d:%d ", filename, line_number, i+1);
+            int format_len = printf("%s:%d:%d: ", filename, line_number, i+1);
             printf("%s\n%*s^\n", line, format_len+i, "");
             i += needle_len;
         } else {
