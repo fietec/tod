@@ -10,7 +10,8 @@
 #define MAX_LINE_LEN 4096
 #define ALPHABET_SIZE 256
 
-void setup_shift_table(const char *needle, int needle_len, int shift_table[]) {
+void setup_shift_table(const char *needle, int needle_len, int shift_table[])
+{
     for (int i = 0; i < ALPHABET_SIZE; i++) {
         shift_table[i] = needle_len;
     }
@@ -19,7 +20,8 @@ void setup_shift_table(const char *needle, int needle_len, int shift_table[]) {
     }
 }
 
-void search_line(const char *filename, const char *line, int line_len, const char *needle, int line_number) {
+void search_line(const char *filename, const char *line, int line_len, const char *needle, int line_number)
+{
     int needle_len = strlen(needle);
     if (needle_len == 0 || needle_len > line_len) return;
 
@@ -100,9 +102,11 @@ int main(int argc, char *argv[])
     const char *program_name = argv[0];
     if (argc < 2){
         fprintf(stderr, "[ERROR] No directory provided!\n");
-        printf("Usage: %s <dir>\n", program_name);
+        printf("Usage: %s <dirs..>\n", program_name);
         return 1;
     }
-    const char *dirpath = argv[1];
-    return search_dir(dirpath, "TODO:");
+    for (int i=1; i<argc; ++i){
+        search_dir(argv[i], "TODO:");
+    }
+    return 0;
 }
