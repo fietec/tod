@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -9,6 +10,31 @@
 
 #define MAX_LINE_LEN 4096
 #define ALPHABET_SIZE 256
+
+typedef struct{
+    const char **items;
+    size_t count;
+    size_t capacity;
+}Paths;
+
+#define da_append(xs, x)                                                             \
+    do {                                                                             \
+        if ((xs)->count >= (xs)->capacity) {                                         \
+            if ((xs)->capacity == 0) (xs)->capacity = 256;                           \
+            else (xs)->capacity *= 2;                                                \
+            (xs)->items = realloc((xs)->items, (xs)->capacity*sizeof(*(xs)->items)); \
+        }                                                                            \
+                                                                                     \
+        (xs)->items[(xs)->count++] = (x);                                            \
+    } while (0)
+
+bool in_paths(Paths paths, const char *item)
+{
+    for (size_t i=0; i<paths.count; ++i){
+        if (strcmp(item, paths.items[i]) == 0) return true;
+    }
+    return false;
+}
 
 void setup_shift_table(const char *needle, int needle_len, int shift_table[])
 {
@@ -67,7 +93,7 @@ int search_file(const char *filename, const char *needle)
     return 0;
 }
 
-int search_dir(const char *dirname, const char *needle)
+int search_dir(const char *dirname, const char *needle, Paths ignore)
 {
     DIR *dir = opendir(dirname);
     if (dir == NULL){
@@ -79,6 +105,7 @@ int search_dir(const char *dirname, const char *needle)
     char item_path[FILENAME_MAX] = {0};
     while ((entry = readdir(dir))){
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        if (in_paths(ignore, entry->d_name)) continue;
         cwk_path_join(dirname, entry->d_name, item_path, sizeof(item_path));
         struct stat attr;
         if (stat(item_path, &attr) == -1){
@@ -86,7 +113,7 @@ int search_dir(const char *dirname, const char *needle)
             continue;
         }
         if (S_ISDIR(attr.st_mode) && *entry->d_name != '.'){
-            (void) search_dir(item_path, needle);
+            (void) search_dir(item_path, needle, ignore);
         }else if (S_ISREG(attr.st_mode)){
             (void) search_file(item_path, needle);
         }else{
@@ -99,6 +126,7 @@ int search_dir(const char *dirname, const char *needle)
 
 int main(int argc, char *argv[]) 
 {
+    Paths ignore = {0};
     const char *program_name = argv[0];
     if (argc < 2){
         fprintf(stderr, "[ERROR] No directory provided!\n");
@@ -106,7 +134,12 @@ int main(int argc, char *argv[])
         return 1;
     }
     for (int i=1; i<argc; ++i){
-        search_dir(argv[i], "TODO:");
+        const char *arg = argv[i];
+        if (*arg == '!'){
+            da_append(&ignore, arg+1);
+        }else{
+            search_dir(arg, "TODO:", ignore);
+        }
     }
     return 0;
 }
