@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include <cwalk.h>
 
@@ -27,6 +28,25 @@ typedef struct{
                                                                                      \
         (xs)->items[(xs)->count++] = (x);                                            \
     } while (0)
+
+#define return_defer(value) do{result = (value); goto defer;}while(0)
+
+char* shift_args(int *argc, char ***argv)
+{
+    assert(*argc > 0 && "argv: out of bounds\n");
+    char *result = **argv;
+    *argc -= 1;
+    *argv += 1;
+    return result;
+}
+
+void print_usage(const char *program_name)
+{
+    printf("Usage: %s [OPTIONS..] [IGNORE..] <dirs..>\n", program_name);
+    printf("  Ignore: !<name>\n");
+    printf("  Options:\n");
+    printf("    --help / -h: print this help\n\n");
+}
 
 bool in_paths(Paths paths, const char *item)
 {
@@ -97,7 +117,7 @@ int search_dir(const char *dirname, const char *needle, Paths ignore)
 {
     DIR *dir = opendir(dirname);
     if (dir == NULL){
-        fprintf(stderr, "[ERROR] Could not open directory: %s: %s!\n", dirname, strerror(errno));
+        fprintf(stderr, "[ERROR] Could not open directory: '%s': %s!\n", dirname, strerror(errno));
         return 1;
     }
     
@@ -126,20 +146,28 @@ int search_dir(const char *dirname, const char *needle, Paths ignore)
 
 int main(int argc, char *argv[]) 
 {
+    int result = 0;
     Paths ignore = {0};
-    const char *program_name = argv[0];
-    if (argc < 2){
+    const char *program_name = shift_args(&argc, &argv);
+    if (argc < 1){
         fprintf(stderr, "[ERROR] No directory provided!\n");
-        printf("Usage: %s <dirs..>\n", program_name);
+        print_usage(program_name);
         return 1;
     }
-    for (int i=1; i<argc; ++i){
-        const char *arg = argv[i];
+    while (argc > 0){
+        const char *arg = shift_args(&argc, &argv);
         if (*arg == '!'){
             da_append(&ignore, arg+1);
-        }else{
-            search_dir(arg, "TODO:", ignore);
+        }
+        else if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0){
+            print_usage(program_name);
+            return_defer(0);
+        }
+        else{
+            search_dir(arg, "TODO:", ignore); // this line should pop up when you run tod on this directory
         }
     }
-    return 0;
+defer:
+    free(ignore.items);
+    return result;
 }
