@@ -8,50 +8,18 @@
 #include <assert.h>
 
 #include <cwalk.h>
+#define CLAGS_IMPLEMENTATION
+#include <clags.h>
 
 #define MAX_LINE_LEN 4096
 #define ALPHABET_SIZE 256
 
-typedef struct{
-    const char **items;
-    size_t count;
-    size_t capacity;
-}Paths;
-
-#define da_append(xs, x)                                                             \
-    do {                                                                             \
-        if ((xs)->count >= (xs)->capacity) {                                         \
-            if ((xs)->capacity == 0) (xs)->capacity = 256;                           \
-            else (xs)->capacity *= 2;                                                \
-            (xs)->items = realloc((xs)->items, (xs)->capacity*sizeof(*(xs)->items)); \
-        }                                                                            \
-                                                                                     \
-        (xs)->items[(xs)->count++] = (x);                                            \
-    } while (0)
-
 #define return_defer(value) do{result = (value); goto defer;}while(0)
 
-char* shift_args(int *argc, char ***argv)
-{
-    assert(*argc > 0 && "argv: out of bounds\n");
-    char *result = **argv;
-    *argc -= 1;
-    *argv += 1;
-    return result;
-}
-
-void print_usage(const char *program_name)
-{
-    printf("Usage: %s [OPTIONS..] [IGNORE..] <dirs..>\n", program_name);
-    printf("  Ignore: !<name>\n");
-    printf("  Options:\n");
-    printf("    --help / -h: print this help\n\n");
-}
-
-bool in_paths(Paths paths, const char *item)
+bool in_paths(clags_list_t paths, const char *item)
 {
     for (size_t i=0; i<paths.count; ++i){
-        if (strcmp(item, paths.items[i]) == 0) return true;
+        if (strcmp(item, clags_list_element(paths, char*, i)) == 0) return true;
     }
     return false;
 }
@@ -113,7 +81,7 @@ int search_file(const char *filename, const char *needle)
     return 0;
 }
 
-int search_dir(const char *dirname, const char *needle, Paths ignore)
+int search_dir(const char *dirname, const char *needle, clags_list_t ignore)
 {
     DIR *dir = opendir(dirname);
     if (dir == NULL){
@@ -144,30 +112,44 @@ int search_dir(const char *dirname, const char *needle, Paths ignore)
     return 0;
 }
 
+clags_list_t input_paths = clags_path_list();
+clags_list_t ignore_names = clags_list();
+bool help = false;
+
+clags_arg_t args[] = {
+    clags_positional(&input_paths, "input_path", "the file or directory to search_in", .value_type=Clags_Path, .is_list=true),
+    clags_option('i', "ignore", &ignore_names, "NAME", "a file or directory to ignore", .is_list=true),
+    clags_flag_help(&help),
+};
+
 int main(int argc, char *argv[]) 
 {
     int result = 0;
-    Paths ignore = {0};
-    const char *program_name = shift_args(&argc, &argv);
-    if (argc < 1){
-        fprintf(stderr, "[ERROR] No directory provided!\n");
-        print_usage(program_name);
-        return 1;
+    const char *program_name = argv[0];
+    clags_config_t config = clags_config(args);
+    if (clags_parse(argc, argv, &config) != NULL){
+        clags_usage(program_name, &config);
+        return_defer(1);
     }
-    while (argc > 0){
-        const char *arg = shift_args(&argc, &argv);
-        if (*arg == '!'){
-            da_append(&ignore, arg+1);
-        }
-        else if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0){
-            print_usage(program_name);
-            return_defer(0);
-        }
-        else{
-            search_dir(arg, "TODO:", ignore); // this line should pop up when you run tod on this directory
+    if (help){
+        clags_usage(program_name, &config);
+        return_defer(0);
+    }
+    const char *needle = "TODO:"; // this line should pop up when you run tod on this directory
+    for (size_t i=0; i<input_paths.count; ++i){
+        char *input_path = clags_list_element(input_paths, char*, i);
+        struct stat attrs;
+        if (stat(input_path, &attrs) == -1) continue;
+        if (S_ISREG(attrs.st_mode)){
+            search_file(input_path, needle);
+        } else if (S_ISDIR(attrs.st_mode)){
+            search_dir(input_path, needle, ignore_names);
+        } else {
+            continue;
         }
     }
+
 defer:
-    free(ignore.items);
+    clags_list_free(&ignore_names);
     return result;
 }
