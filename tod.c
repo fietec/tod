@@ -16,6 +16,12 @@
 
 #define return_defer(value) do{result = (value); goto defer;}while(0)
 
+const char* skip_spaces(const char *s)
+{
+    while (isspace(*s)) ++s;
+    return s;
+}
+
 bool in_paths(clags_list_t paths, const char *item)
 {
     for (size_t i=0; i<paths.count; ++i){
@@ -50,7 +56,8 @@ void search_line(const char *filename, const char *line, int line_len, const cha
         }
         if (j < 0) {
             int format_len = printf("%s:%d:%d: ", filename, line_number, i+1);
-            printf("%s\n%*s^\n", line, format_len+i, "");
+            const char *trimmed = skip_spaces(line);
+            printf("%s\n%*s^\n", trimmed, format_len+i-(int)(trimmed-line), "");
             i += needle_len;
         } else {
             unsigned char mismatched_char = line[i + needle_len - 1];
